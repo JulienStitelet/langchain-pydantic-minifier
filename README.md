@@ -2,7 +2,7 @@
 
 Here's a new class: MinifiedPydanticOutputParser, a drop-in replacement for PydanticOutputParser that automatically reduces token usage by replacing field names with short identifiers (e.g., a, b, c, …), while preserving full descriptions and reversibility.
 
-![MinifiedPydanticOutputParser](resources/splash.png)
+![MinifiedPydanticOutputParser](https://github.com/JulienStitelet/langchain-pydantic-minifier/blob/main/resources/splash.png)
 
 ## ✨ What It Does
 * Transforms a given Pydantic schema by replacing verbose field names with shorter aliases.

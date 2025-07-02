@@ -1,6 +1,6 @@
 [project]
 name = "langchain-pydantic-minifier"
-version = "0.1.7"
+version = "0.1.8"
 description = "automatically reduces token usage by replacing field names with short identifiers (e.g., a, b, c, …), while preserving full descriptions and reversibility."
 authors = [{ name = "JulienStitelet", email = "julien.stitelet@gmail.com" }]
 license = "MIT"
