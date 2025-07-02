@@ -1,14 +1,9 @@
 [project]
 name = "langchain-pydantic-minifier"
-version = "0.1.2"
+version = "0.1.5"
 description = "automatically reduces token usage by replacing field names with short identifiers (e.g., a, b, c, …), while preserving full descriptions and reversibility."
-authors = [
-    { name = "JulienStitelet", email = "julien.stitelet@careerbuilder.com" },
-]
+authors = [{ name = "JulienStitelet", email = "julien.stitelet@gmail.com" }]
 license = "MIT"
-homepage = "https://github.com/JulienStitelet/langchain-pydantic-minifier"
-repository = "https://github.com/julienstitelet/langchain-pydantic-minifier"
-documentation = "https://github.com/julienstitelet/langchain-pydantic-minifier#readme"
 readme = "README.md"
 requires-python = ">=3.9,<4.0"
 dependencies = [
@@ -26,6 +21,12 @@ isort = "^6.0.1"
 black = "^25.1.0"
 pylint = "^3.3.7"
 pytest = "^8.4.1"
+
+
+[project.urls]
+homepage = "https://github.com/JulienStitelet/langchain-pydantic-minifier"
+repository = "https://github.com/julienstitelet/langchain-pydantic-minifier"
+documentation = "https://github.com/julienstitelet/langchain-pydantic-minifier#readme"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/julienstitelet/langchain-pydantic-minifier/issues"

@@ -20,7 +20,14 @@ In personal benchmarks, this optimization led to a ~30% reduction in LLM respons
 
 ## 💸 This also translates to lower API costs, especially in high-throughput or large-output scenarios.
 
-## 🧪 Example
+## Examples
+
+* [See Gemini example](examples/gemini.md)
+* [see OpenAI OutputParser example](examples/openai_output_parser.md)
+* [see OpenAI structured_output strict example](examples/openai_strict.md)
+
+
+## 🧪 What it does
 
 Given:
 ```python

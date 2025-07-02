@@ -7,6 +7,7 @@ from langchain_core.outputs.generation import Generation
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# pylint: disable=too-many-ancestors
 class MinifiedPydanticOutputParser(PydanticOutputParser):
     """Minify Pydantic schema by replacing field names with short identifiers.
 
