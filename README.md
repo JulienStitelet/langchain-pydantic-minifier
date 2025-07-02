@@ -1,6 +1,9 @@
 # 🚀 Add MinifiedPydanticOutputParser to Optimize Token Usage in LLM Outputs
 
-This PR introduces a new class: MinifiedPydanticOutputParser, a drop-in replacement for PydanticOutputParser that automatically reduces token usage by replacing field names with short identifiers (e.g., a, b, c, …), while preserving full descriptions and reversibility.
+Here's a new class: MinifiedPydanticOutputParser, a drop-in replacement for PydanticOutputParser that automatically reduces token usage by replacing field names with short identifiers (e.g., a, b, c, …), while preserving full descriptions and reversibility.
+
+![MinifiedPydanticOutputParser](resources/splash.png)
+
 ## ✨ What It Does
 * Transforms a given Pydantic schema by replacing verbose field names with shorter aliases.
 * Retains all Field(..., description=...) information — essential for prompt construction and LLM understanding.
