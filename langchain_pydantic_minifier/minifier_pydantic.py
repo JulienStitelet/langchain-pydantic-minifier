@@ -141,6 +141,8 @@ class MinifiedPydanticOutputParser(PydanticOutputParser):
         else:
             # Clean None values in-place for memory efficiency
             data = self._remove_none_values(llm_result)
+            minified = self.minified(**data)
+            return self.get_original(minified)
 
         return self.original_type(**data)
 

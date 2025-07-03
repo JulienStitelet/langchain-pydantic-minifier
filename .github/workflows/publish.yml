@@ -1,8 +1,9 @@
 name: Publish to PyPI
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - main
 
 jobs:
   publish:
@@ -21,13 +22,12 @@ jobs:
         version: latest
         virtualenvs-create: true
         virtualenvs-in-project: true
-    
-    - name: Update version from tag
-      run: |
-        # Use GitHub's built-in context
-        VERSION=${{ github.ref_name }}
-        echo "Setting version to: $VERSION"
-        poetry version $VERSION
+
+    # Optional: set version from tag or commit (remove if you manage version manually in pyproject.toml)
+    # - name: Set version from commit (optional)
+    #   run: |
+    #     COMMIT_HASH=$(git rev-parse --short HEAD)
+    #     poetry version "$(poetry version -s).dev0+${COMMIT_HASH}"
 
     - name: Build package
       run: poetry build
