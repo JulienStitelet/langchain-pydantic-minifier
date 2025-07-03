@@ -24,10 +24,11 @@ jobs:
     
     - name: Update version from tag
       run: |
-        # Extract version from GitHub release tag (removes 'v' prefix if present)
-        VERSION=${GITHUB_REF#refs/tags/v}
+        # Use GitHub's built-in context
+        VERSION=${{ github.ref_name }}
+        echo "Setting version to: $VERSION"
         poetry version $VERSION
-    
+
     - name: Build package
       run: poetry build
     
