@@ -6,8 +6,7 @@ from typing import Any, Optional, Union
 from langchain_core.outputs.generation import Generation
 from pydantic import BaseModel, Field
 
-from langchain_pydantic_minifier.minifier_pydantic import \
-    MinifiedPydanticOutputParser
+from langchain_pydantic_minifier.minifier_pydantic import MinifiedPydanticOutputParser
 
 
 class User(BaseModel):

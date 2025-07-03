@@ -25,9 +25,9 @@ In personal benchmarks, this optimization led to a ~30% reduction in LLM respons
 
 ## Examples
 
-* [See Gemini example](https://github.com/JulienStitelet/langchain-pydantic-minifier/blob/main/examples/gemini.md)
+* [See Gemini example](https://github.com/JulienStitelet/langchain-pydantic-minifier/blob/main/examples/test_minified_gemini_with_parser.md)
 * [see OpenAI OutputParser example](https://github.com/JulienStitelet/langchain-pydantic-minifier/blob/main/examples/openai_output_parser.md)
-* [see OpenAI structured_output strict example](https://github.com/JulienStitelet/langchain-pydantic-minifier/blob/main/examples/openai_strict.md)
+* [see OpenAI structured_output strict example](https://github.com/JulienStitelet/langchain-pydantic-minifier/blob/main/examples/test_minified_with_structured_output.md)
 
 
 ## 🧪 What it does

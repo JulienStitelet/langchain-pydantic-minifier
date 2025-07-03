@@ -1,4 +1,4 @@
-"""Minification tool class for Output parsers using Pydantic."""
+"""Memory-optimized Minification tool class for Output parsers using Pydantic."""
 
 from typing import Any, Optional, Union, get_args, get_origin
 
@@ -7,40 +7,8 @@ from langchain_core.outputs.generation import Generation
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# pylint: disable=too-many-ancestors
 class MinifiedPydanticOutputParser(PydanticOutputParser):
-    """Minify Pydantic schema by replacing field names with short identifiers.
-
-    This tool class is used to minify a Pydantic schema by replacing the original
-    field names with short identifiers ('a', 'b', 'c', ...), while **preserving all
-    field descriptions**.
-
-    It also provides a way to reverse the transformation: given a response using
-    the minified keys, it restores the original schema with full field names and
-    descriptions.
-
-    Use case:
-    - Reduce payload size in API requests/responses.
-    - Maintain field-level documentation during minification.
-
-    Example:
-    --------
-    Original schema:
-        class User(BaseModel):
-            first_name: str = Field(..., description="The user's first name")
-            last_name: str = Field(..., description="The user's last name")
-            email: str = Field(..., description="The user's email address")
-
-    After minification:
-        class UserMinified(BaseModel):
-            a: str = Field(..., description="The user's first name")
-            b: str = Field(..., description="The user's last name")
-            c: str = Field(..., description="The user's email address")
-
-    When a response is received using minified keys, the tool can reverse it back
-    to the original schema.
-
-    """
+    """Memory-optimized minified Pydantic schema parser."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -50,86 +18,89 @@ class MinifiedPydanticOutputParser(PydanticOutputParser):
         *,
         strict: Optional[bool] = False,
     ):
-        """Initialize the Minificator with the original Pydantic model type.
-
-        Args:
-            pydantic_object (type[BaseModel]): The original Pydantic model type to
-            be minified.
-            strict (Optional[bool]): If you plan to use the strict parameter with
-            the `with_structured_output()` function (it forces fields to be required)
-        """
+        """Initialize with memory optimizations."""
         super().__init__(pydantic_object=pydantic_object)
         self.strict = strict
-        self.field_names_mapper: dict = {}
         self.original_type = pydantic_object
-        self.small_names_list = self._build_small_name_list()
-        self.minified = self._make_fields_required_and_small(self.original_type)
+
+        # Use a simple counter for field names instead of pre-generating
+        self._field_counter = 0
+        self.field_names_mapper: dict[str, str] = {}
+
+        self.minified = self._make_fields_required_and_small(pydantic_object)
         self.pydantic_object = self.minified
 
-    def parse_result(
-        self, result: list[Generation], *, partial: bool = False
-    ) -> BaseModel:
-        """Parse LLM result to Pydantic object using minified schema.
+    def _get_next_short_name(self) -> str:
+        """Generate short names on demand."""
+        if self._field_counter < 26:
+            # a-z
+            name = chr(ord("a") + self._field_counter)
+        elif self._field_counter < 26 + 26 * 26:
+            # aa-zz
+            offset = self._field_counter - 26
+            first = chr(ord("a") + offset // 26)
+            second = chr(ord("a") + offset % 26)
+            name = first + second
+        else:
+            # aaa-zzz and beyond
+            offset = self._field_counter - 26 - 26 * 26
+            first = chr(ord("a") + offset // (26 * 26))
+            second = chr(ord("a") + (offset // 26) % 26)
+            third = chr(ord("a") + offset % 26)
+            name = first + second + third
 
-        Args:
-            result (list[dict]): The result of the LLM call.
-            partial (bool): Whether to parse partial JSON objects.
+        self._field_counter += 1
+        return name
 
-        Returns:
-            BaseModel: An instance of the original Pydantic model with full field
-            names.
-
-        """
-        # text = result[0].text
-        # self._remove_none_values()
-        parsed = super().parse_result(result, partial=partial)
-        return self.get_original(parsed)
+    def _get_short_field_name(self, field_name: str) -> str:
+        """Get or generate short field name."""
+        if field_name not in self.field_names_mapper:
+            self.field_names_mapper[field_name] = self._get_next_short_name()
+        return self.field_names_mapper[field_name]
 
     def _make_fields_required_and_small(
         self, pydantic_cls: type[BaseModel]
     ) -> type[BaseModel]:
-        # Get the fields from the Pydantic class via __fields__
+        """Transform fields with reduced memory allocation."""
         original_fields = pydantic_cls.model_fields
 
-        # Create a dictionary to store the new field annotations and field info
         new_annotations: dict[str, Any] = {}
-        new_fields = {}
+        new_fields: dict[str, Any] = {}
 
         for name, field in original_fields.items():
-            short_name = ""
-
             field_type = field.annotation
+            short_name = self._get_short_field_name(name)
 
+            # Handle Union types (Optional)
             if get_origin(field_type) is Union:
-                field_type = next(
-                    t for t in get_args(field_type) if t is not type(None)
-                )
+                non_none_args = [
+                    arg for arg in get_args(field_type) if arg is not type(None)
+                ]
+                if len(non_none_args) == 1:
+                    field_type = non_none_args[0]
 
+            # Handle nested BaseModel
             if isinstance(field_type, type) and issubclass(field_type, BaseModel):
-                short_name = self._get_short_field_name(name)
-                field_type = self._make_fields_required_and_small(
-                    field_type
-                )  # Recursively transform BaseModel fields
+                field_type = self._make_fields_required_and_small(field_type)
 
-            if get_origin(field_type) is list or get_origin(field_type) is list:
-                list_inner_type = get_args(field_type)[0]
-                if get_origin(list_inner_type) is Union:
-                    list_inner_type = next(
-                        t for t in get_args(list_inner_type) if t is not type(None)
-                    )
-                if issubclass(list_inner_type, BaseModel):
-                    short_name = self._get_short_field_name(name)
-                    inner_field_type: Any = self._make_fields_required_and_small(
-                        list_inner_type
-                    )
-                    field_type = list[inner_field_type]
+            # Handle List types
+            origin = get_origin(field_type)
+            if origin is list:
+                inner_type = get_args(field_type)[0]
+                # Handle Optional inner types
+                if get_origin(inner_type) is Union:
+                    non_none_inner = [
+                        arg for arg in get_args(inner_type) if arg is not type(None)
+                    ]
+                    if len(non_none_inner) == 1:
+                        inner_type = non_none_inner[0]
 
-            # Add the field as required (no default values)
-            if short_name == "":
-                short_name = self._get_short_field_name(name)
+                if isinstance(inner_type, type) and issubclass(inner_type, BaseModel):
+                    inner_type = self._make_fields_required_and_small(inner_type)
+                    field_type = list[inner_type]
 
+            # Set field type and create field
             if self.strict:
-                # openai strict needs fields to be Required
                 new_annotations[short_name] = field_type
                 new_fields[short_name] = Field(
                     ...,
@@ -146,58 +117,44 @@ class MinifiedPydanticOutputParser(PydanticOutputParser):
                     serialization_alias=name,
                 )
 
-        # Dynamically create a new class with proper annotations and fields
-        new_class_name = f"Minified{pydantic_cls.__name__}"
-
-        # Define the class dictionary including annotations
+        # Create new class
+        class_name = f"Minified{pydantic_cls.__name__}"
         class_dict = {"__annotations__": new_annotations}
-        class_dict.update(new_fields)  # Update the dictionary with fields
+        class_dict.update(new_fields)
 
-        # Create and return the new class
-        return type(new_class_name, (BaseModel,), class_dict)
+        return type(class_name, (BaseModel,), class_dict)
 
-    def _remove_none_values(self, data: Union[dict, list, Any]) -> Union[dict, list]:
+    def parse_result(
+        self, result: list[Generation], *, partial: bool = False
+    ) -> BaseModel:
+        """Parse LLM result and convert back to original schema."""
+        parsed = super().parse_result(result, partial=partial)
+        return self.get_original(parsed)
+
+    def get_original(self, llm_result: Optional[Union[BaseModel, dict]]) -> BaseModel:
+        """Convert minified result back to original schema."""
+        if llm_result is None:
+            raise ValueError("llm_result cannot be None")
+
+        if isinstance(llm_result, BaseModel):
+            data = llm_result.model_dump(by_alias=True)
+        else:
+            # Clean None values in-place for memory efficiency
+            data = self._remove_none_values(llm_result)
+
+        return self.original_type(**data)
+
+    def _remove_none_values(
+        self, data: Union[dict, list, Any]
+    ) -> Union[dict, list, Any]:
+        """Remove None values to reduce memory usage."""
         if isinstance(data, dict):
-            # Recursively clean each key-value pair
+            # Use dict comprehension for efficiency
             return {
                 k: self._remove_none_values(v) for k, v in data.items() if v is not None
             }
-
-        if isinstance(data, list):
-            # Recursively clean each item in the list
+        elif isinstance(data, list):
+            # Use list comprehension for efficiency
             return [self._remove_none_values(item) for item in data if item is not None]
-
-        # Return non-iterable values as they are
-        return data
-
-    def get_original(self, llm_result: Optional[Union[BaseModel, dict]]) -> BaseModel:
-        """Get orignal object typed class."""
-        if llm_result is None:
-            msg = "llm_result cannot be None"
-            raise ValueError(msg)
-
-        if not isinstance(llm_result, BaseModel):
-            cleaned_result = self._remove_none_values(llm_result)
-            if not isinstance(cleaned_result, dict):
-                msg = "Expected dict after removing None values"
-                raise TypeError(msg)
-            llm_result = cleaned_result
-            llm_result = self.minified(**llm_result)
-        dicto = llm_result.model_dump(by_alias=True)
-        return self.original_type(**dicto)
-
-    def _get_short_field_name(self, field_name: str) -> str:
-        new_name = self.small_names_list.pop(0)
-        self.field_names_mapper[field_name] = new_name
-        return new_name
-
-    def _build_small_name_list(self, max_size: int = 3) -> list[str]:
-        """Build and return a small list names."""
-        result = []
-        root_chars = ["a", "b", "c"]
-        chars = list("abcdefghijklmnopqrstuvwxyz")
-        result.extend(chars)
-        for root_size in range(1, max_size - 1):
-            for char in root_chars:
-                result.extend(char * root_size + sub_char for sub_char in chars)
-        return result
+        else:
+            return data

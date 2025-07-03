@@ -34,5 +34,5 @@ coverage:
 preco:
     poetry run isort .
     poetry run black .
-    poetry run pytest
+    poetry run pytest ./tests
     poetry run pylint langchain_pydantic_minifier/

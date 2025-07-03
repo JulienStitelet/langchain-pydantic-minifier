@@ -1,20 +1,28 @@
-# Example using Google Gemini
+"""test parser"""
 
-```python
+# pylint: disable=wrong-import-position
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
+import logging
 import time
 from typing import Optional
 
-from langchain.callbacks import get_openai_callback
+from langchain_community.callbacks.manager import get_openai_callback
 from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.output_parsers.minified_pydantic import MinifiedPydanticOutputParser
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-from langchain_google_genai import (
-    ChatGoogleGenerativeAI,
-    HarmBlockThreshold,
-    HarmCategory,
-)
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
+
+from langchain_pydantic_minifier.minifier_pydantic import MinifiedPydanticOutputParser
+
+# will print out the openai payload sent
+openai_logger = logging.getLogger("openai._base_client")
+openai_logger.setLevel(logging.DEBUG)
+console_handler = logging.StreamHandler()
+openai_logger.addHandler(console_handler)
 
 # SAMPLE JOURNALIST RESUME
 # *This is a fictional example for template/educational purposes only*
@@ -197,53 +205,56 @@ class ProfileResponse(BaseModel):
     )
 
 
-default_block_treshold = HarmBlockThreshold.BLOCK_NONE
-safety_config = {
-    HarmCategory.HARM_CATEGORY_DANGEROUS: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_DEROGATORY: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_HARASSMENT: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_HATE_SPEECH: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_MEDICAL: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_SEXUAL: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_TOXICITY: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_UNSPECIFIED: default_block_treshold,
-    HarmCategory.HARM_CATEGORY_VIOLENCE: default_block_treshold,
-}
-
-model = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite-preview-06-17",
+model = ChatOpenAI(
+    model="gpt-4o-mini",
+    request_timeout=10,
     temperature=0.0,
-    timeout=10,
-    api_key="your_key",
-    safety_settings=safety_config,
     max_retries=0,
 )
 
-
+default_parser = PydanticOutputParser(pydantic_object=ProfileResponse)
 minifying_parser = MinifiedPydanticOutputParser(pydantic_object=ProfileResponse)
-results = {"minifying_parser": {}}
+results = {"default_parser": {}, "minifying_parser": {}}
 query = RESUME
 
-chat_prompt = PromptTemplate(
-    template="{system_prompt}\n\n{format_instructions}\n\nHere is the resume:\n{query}\n.",
-    input_variables=["human_message"],
-    partial_variables={
-        "system_prompt": "Extract information from the given raw text resume. Wrap the output in `json` tags",
-        "format_instructions": minifying_parser.get_format_instructions(),
-    },
-)
-
-print(chat_prompt.invoke({"query": query}).to_string())
-chain = chat_prompt | model | minifying_parser
+default_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """Extract information from the given raw text resume. 
+            Wrap the output in `json` tags\n{format_instructions}""",
+        ),
+        ("human", "{query}"),
+    ]
+).partial(format_instructions=default_parser.get_format_instructions())
+# print(default_prompt.invoke({"query": query}).to_string())
+chain = default_prompt.pipe(model).pipe(default_parser)
 start = time.time()
 with get_openai_callback() as cb:
-    llm_response: BaseModel = chain.invoke({"query": query})
+    llm_response = chain.invoke({"query": query})
+    results["default_parser"]["time"] = time.time() - start
+    results["default_parser"]["cb"] = cb
+
+
+minifying_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "Extract information from the given raw text resume. Wrap the output in `json` tags\n{format_instructions}",
+        ),
+        ("human", "{query}"),
+    ]
+).partial(format_instructions=minifying_parser.get_format_instructions())
+# print(minifying_prompt.invoke({"query": query}).to_string())
+chain = minifying_prompt.pipe(model).pipe(minifying_parser)
+
+start = time.time()
+with get_openai_callback() as cb:
+    llm_response = chain.invoke({"query": query})
     results["minifying_parser"]["time"] = time.time() - start
     results["minifying_parser"]["cb"] = cb
 
+
+# Print the response
 print(results)
-print(llm_response.model_dump())
-```
+print(llm_response)
